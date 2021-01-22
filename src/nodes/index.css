@@ -1,0 +1,17 @@
+.node{
+    width: 120px;
+    height: 120px;
+    position: relative;
+    margin:0 auto;  
+    padding: 0 40px;
+}
+.content{
+    border:1px solid #608fff;
+    height: 100%;
+}
+.line{
+    height: 20px;
+    width: 1px;
+    background-color: #608fff;
+    margin:0 auto;
+}
