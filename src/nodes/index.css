@@ -3,11 +3,15 @@
     height: 120px;
     position: relative;
     margin:0 auto;  
-    padding: 0 40px;
+    padding: 0 80px;
+    box-sizing: initial;
 }
 .content{
     border:1px solid #608fff;
     height: 100%;
+}
+.gateway{
+    height: 40px;
 }
 .line{
     height: 20px;
