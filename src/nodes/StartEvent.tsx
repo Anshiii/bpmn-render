@@ -2,9 +2,6 @@ import React, { memo } from "react";
 import "./index.css";
 import { Popover, Button } from "antd";
 import BpmnModdle from "bpmn-moddle";
-import update from "immutability-helper";
-import { drawNode } from "../App";
-import { uuid, findEndLast, next } from "../util";
 
 const moddle = new BpmnModdle();
 

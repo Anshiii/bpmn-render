@@ -16,7 +16,7 @@ const ExclusiveGateway: React.FC<IProps> = memo(({ node }) => {
       <div className="line"></div>
       <div className="node gateway">
         <div className="content" onClick={addCondition}>
-          <div> 添加条件</div>
+          <div onClick={addCondition}> 添加条件</div>
         </div>
       </div>
       <div className="line"></div>

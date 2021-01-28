@@ -14,7 +14,7 @@ interface IProps {
   setParent?: any;
 }
 
-const SequenceFlow: React.FC<IProps> = memo(
+const ManualTask: React.FC<IProps> = memo(
   ({ name, id, node, setParent, ...rest }) => {
     const { conditionExpression } = node;
     const addNode = (e: any) => {
@@ -139,17 +139,9 @@ const SequenceFlow: React.FC<IProps> = memo(
     };
 
     // 特别类型支持添加条件
-
     return (
       <div id={id}>
         <div className="line"></div>
-        {/* 条件语句的 flow 需要渲染条件内容 */}
-        {conditionExpression
-          ? [
-              <div>{conditionExpression.body}</div>,
-              <div className="line"></div>,
-            ]
-          : null}
         <Popover
           content={
             <div onClick={addNode}>
@@ -169,4 +161,4 @@ const SequenceFlow: React.FC<IProps> = memo(
   }
 );
 
-export default SequenceFlow;
+export default ManualTask;

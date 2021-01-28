@@ -2,6 +2,7 @@ import StartEvent from "./nodes/StartEvent";
 import ExclusiveGateway from "./nodes/ExclusiveGateway";
 import EndEvent from "./nodes/EndEvent";
 import SequenceFlow from "./nodes/SequenceFlow";
+import ManualTask from "./nodes/ManualTask";
 import Task from "./nodes/Task";
 
 // 普通的 bpmn:SequenceFlow 不绘制？只绘制条件语句的 flow？
@@ -26,7 +27,9 @@ let render: any = {
       case "bpmn:EndEvent":
         return <EndEvent name="流程结束" node={node} {...option}></EndEvent>;
       case "bpmn:ManualTask":
-        return <div>unless</div>;
+        return (
+          <ManualTask name={""} id={id} node={node} {...option}></ManualTask>
+        );
       case "bpmn:StartEvent":
         return (
           <StartEvent name={name} id={id} node={node} {...option}></StartEvent>

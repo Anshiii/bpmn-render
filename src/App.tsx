@@ -1,107 +1,26 @@
 // disable-eslint
+// @ts-nocheck
 import React, { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import BpmnModdle from "bpmn-moddle";
 import render from "./render";
 import { Popover } from "antd";
+import { uuid, download, getEndWayFromGateway } from "./util";
+import draw from "./walker/draw";
 // import bpmn from './duban.bpmp'
 import "antd/dist/antd.css";
 const moddle = new BpmnModdle();
 
-// var reader = new FileReader();
-// reader.readAsText(bpmn);
-// reader.onloadend = function () {
-//   var xmlData = reader.result;
-//   moddle
-//     .fromXML(xmlData as string, (res) => {
-//       console.log(res);
-//     })
-//     //@ts-ignore
-//     .then((res) => {
-//       console.log("233", res);
-//       setLoad(res.rootElement.rootElements);
-//     });
-// };
-
 // 出现内环时，需要记录绘制过的元素，不然会栈溢出
-const done: any = {};
-let END: any = {};
 
 export const TEM: any = {};
-
-export const drawNode = ({ node, ...rest }: any): any => {
-  console.log(node);
-  if (!node || !node.$type) return;
-  const { $type, id, name, outgoing, targetRef, sourceRef } = node;
-  const { setEnd } = rest;
-
-  // 不绘制的元素，仅用于存储指针的点
-  if (name === "unless") {
-    return drawNode({ node: outgoing[0]?.targetRef, ...rest });
-  }
-  // 重复元素排除
-  // if (done[id]) return null;
-  // done[id] = true;
-  // if ($type === "bpmn:SequenceFlow") {
-  //   // 如果是网关后面的 SequenceFlow 需要绘制出来
-  //   if (sourceRef.$type === "bpmn:ExclusiveGateway") {
-  //     return [
-  //       render.handler($type, node, rest),
-  //       drawNode({ node: targetRef, ...rest }),
-  //     ];
-  //   }
-  //   return drawNode({ node: targetRef, ...rest });
-  // }
-  // end 节点特殊对待,要渲染在最后
-  if ($type === "bpmn:EndEvent") {
-    console.log($type, node);
-
-    setEnd(node);
-    return;
-  }
-  return [
-    render.handler($type, node, rest),
-    (() => {
-      if ($type === "bpmn:ExclusiveGateway") {
-        return (
-          <div className="branch">
-            <div style={{ display: "flex" }}>
-              {outgoing?.map((item: any) => (
-                <div className="wrap">{drawNode({ node: item, ...rest })}</div>
-              ))}
-            </div>
-
-            <div className="line"></div>
-            <Popover
-              content={
-                <div onClick={undefined}>
-                  <div data-type="append">审批人</div>
-                  <div data-type="cc">抄送人</div>
-                  <div data-type="condition">条件分支</div>
-                </div>
-              }
-              title="null"
-              trigger="click"
-            >
-              <div>+</div>
-            </Popover>
-            <div className="line"></div>
-          </div>
-        );
-      } else {
-        return (outgoing || [targetRef])?.map((item: any) =>
-          drawNode({ node: item, ...rest })
-        );
-      }
-    })(),
-  ];
-};
 
 // tree 结构
 function App() {
   const [content, setContent] = useState<any>(null);
   const [parent, setParent] = useState<any>();
+  const [definitions, setDefinitions] = useState<any>();
   const [end, setEnd] = useState<any>();
 
   useEffect(() => {
@@ -109,10 +28,34 @@ function App() {
     const start = parent.flowElements.find(
       (item: any) => item.$type === "bpmn:StartEvent"
     );
-    setContent(drawNode({ node: start, setParent, setEnd, end }));
+    setContent(draw({ node: start, setParent, setEnd, end }));
   }, [parent, setContent, setParent, end]);
 
-  console.log("END", end);
+  const toXML = async () => {
+    const moddle = new BpmnModdle();
+    const xmlStr =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" ' +
+      'id="empty-definitions" ' +
+      'targetNamespace="http://bpmn.io/schema/bpmn">' +
+      "</bpmn2:definitions>";
+
+    const { rootElement: definitions } = await moddle.fromXML(xmlStr);
+    // update id attribute
+    definitions.set("id", uuid("Definitions"));
+
+    definitions.get("rootElements").push(parent);
+
+    // parent.$parent = definitions;
+    // add a root element
+    // definitions.rootElements = [parent];
+
+    console.log("parent", parent, parent.isGeneric);
+
+    // xmlStrUpdated contains new id and the added process
+    const { xml: xmlStrUpdated } = await moddle.toXML(definitions);
+    download(xmlStrUpdated);
+  };
 
   return (
     <div className="App">
@@ -133,6 +76,7 @@ function App() {
                 //@ts-ignore
                 .then((res) => {
                   TEM.elementsById = res.elementsById;
+                  setDefinitions(res.rootElement);
                   console.log("response", res);
                   setParent(res.rootElement.rootElements[0]);
                 });
@@ -142,9 +86,7 @@ function App() {
         {content}
         {end?.$type ? render.handler(end.$type, end) : null}
         <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
+        <p onClick={toXML}>导出 XML ???</p>
         <a
           className="App-link"
           href="https://reactjs.org"
