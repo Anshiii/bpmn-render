@@ -7,6 +7,7 @@ export function uuid(type: string): string {
   return `${type}_${Math.random().toString(36).slice(-6)}`;
 }
 
+// 确保该节点不存在多目标 即确保不是 gateway
 export function next(node: any) {
   if (!node) return;
   if (node.$type === "bpmn:EndEvent") return;
@@ -69,18 +70,26 @@ export function getEndWayFromGateway(node: any) {
   return findElementFromParent(node.$parent, endWayId);
 }
 
-// walk 节点
+// walk 节点(存在分支多向节点)
 // 不会包括符合 endFc 的node
 export function walk(
   start: any,
   endFc: (node: any) => boolean,
   cb: (node: any) => void
 ) {
-  if (!start) return;
-  if (endFc(start)) return;
-  cb(start);
-
-  walk(next(start), endFc, cb);
+  const stack = [start];
+  let current = start;
+  while (stack.length) {
+    if (!endFc(current)) {
+      cb(current);
+      if (current.targetRef) {
+        stack.push(current.targetRef);
+      } else if (current.outgoing) {
+        stack.push(...current.outgoing);
+      }
+    }
+    current = stack.pop();
+  }
 }
 
 // 下载文件

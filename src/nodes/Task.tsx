@@ -1,9 +1,6 @@
 import React, { memo } from "react";
 import "./index.css";
-import BpmnModdle from "bpmn-moddle";
-import { pick } from "lodash";
-
-const moddle = new BpmnModdle();
+import { changeFlowElements, updateParent } from "../util";
 
 interface IProps {
   name: string;
@@ -20,35 +17,13 @@ const Task: React.FC<IProps> = memo(({ name, id, node, setParent }) => {
     /* 普通节点出口一般只会是一条线， gateway 除外 */
     const next = node.outgoing[0]; // 应该是 seqFlow
     const last = node.incoming[0]; // 应该是 seqFlow
-
+    const parent = node.$parent;
     // next 和 last 应该都是 seqFlow 类型
     last.set("targetRef", next.targetRef);
     next.targetRef.set("incoming", [last]);
 
-    node.$parent.set(
-      "flowElements",
-      node.$parent.flowElements.filter(
-        (item: any) => item !== node && item !== next
-      )
-    );
-
-    setParent(
-      moddle.create("bpmn:Process", {
-        ...pick(node.$parent, ["flowElements", "id"]),
-      })
-    );
-
-    // 清空被删除节点的指针
-    node.set("outgoing", undefined);
-    node.set("incoming", undefined);
-
-    next.set("targetRef", undefined);
-    next.set("sourceRef", undefined);
-
-    node.outgoing = null;
-    node.incoming = null;
-    next.targetRef = null;
-    next.sourceRef = null;
+    changeFlowElements(parent, "-", node, next);
+    setParent(updateParent(parent));
   };
 
   return (
@@ -66,3 +41,4 @@ const Task: React.FC<IProps> = memo(({ name, id, node, setParent }) => {
 });
 
 export default Task;
+
