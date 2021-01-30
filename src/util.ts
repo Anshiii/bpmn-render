@@ -70,6 +70,7 @@ export function getEndWayFromGateway(node: any) {
 }
 
 // walk 节点
+// 不会包括符合 endFc 的node
 export function walk(
   start: any,
   endFc: (node: any) => boolean,
@@ -78,6 +79,7 @@ export function walk(
   if (!start) return;
   if (endFc(start)) return;
   cb(start);
+
   walk(next(start), endFc, cb);
 }
 

@@ -158,16 +158,20 @@ const SequenceFlow: React.FC<IProps> = memo(
         (item: any) => item === node
       );
 
+      // 被删除的分支所有节点
+      const delNodes: any[] = [];
+      walk(
+        node,
+        (node: any) => node === endWay, // 不会包括符合 endFc 的node
+        (node: any) => {
+          delNodes.push(node);
+        }
+      );
+
       if (gateWay.outgoing.length > 2) {
+        console.log("del confition");
+
         // 只删除某条 condition 分支
-        const delNodes: any[] = [];
-        walk(
-          node,
-          (node: any) => next(node) === endWay,
-          (node: any) => {
-            delNodes.push(node);
-          }
-        );
 
         gateWay.outgoing.splice(conditionIdx, 1);
         endWay.incoming.splice(conditionIdx, 1);
@@ -175,7 +179,46 @@ const SequenceFlow: React.FC<IProps> = memo(
         changeFlowElements(node.$parent, "-", ...delNodes);
         // @TODO 清除被删除节点的指针关系？
       } else {
+        console.log("del gateway");
         // 删除包括 gateway/unless 在内的整个条件分支...
+        const gateWayLastSeq = gateWay.incoming[0]; //
+        const endWayNextSeq = endWay.outgoing[0];
+
+        // 此时 outgoing/incoming 应该只有两个分支
+        const restConditionStart = gateWay.outgoing.find(
+          (i: any, idx: any) => idx !== conditionIdx
+        );
+        const restConditionEnd = endWay.incoming.find(
+          (i: any, idx: any) => idx !== conditionIdx
+        ).sourceRef; // 取节点，不取seq
+
+        // 删除条件后，多余的 seq 也需要删除
+        const endWayNextNode = endWayNextSeq.targetRef;
+        const endWayNextSeqIdx = endWayNextNode.incoming.findIndex(
+          (item: any) => item === endWayNextSeq
+        );
+        // 如果节点是gateWay，表示剩余分支只有条件。
+        if (restConditionEnd === gateWay) {
+          endWayNextNode.incoming.splice(endWayNextSeqIdx, 1, gateWayLastSeq);
+          gateWayLastSeq.targetRef = endWayNextNode;
+        } else {
+          gateWayLastSeq.targetRef = restConditionEnd;
+          restConditionEnd.incoming = [gateWayLastSeq];
+          const endWayLastSeq = restConditionEnd.outgoing[0];
+
+          endWayNextNode.incoming.splice(endWayNextSeqIdx, 1, endWayLastSeq);
+          endWayLastSeq.targetRef = endWayNextNode;
+        }
+
+        changeFlowElements(
+          node.$parent,
+          "-",
+          ...delNodes,
+          gateWay,
+          endWay,
+          endWayNextSeq,
+          restConditionStart
+        );
       }
 
       setParent(updateParent(parent));
