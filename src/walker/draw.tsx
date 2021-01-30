@@ -3,6 +3,7 @@ import render from "../render";
 import { getEndWayFromGateway, next } from "../util";
 
 const drawBranch = ({ node, ...rest }: any) => {
+  console.log(node);
   const { $type, id, name, outgoing, targetRef, sourceRef } = node;
 
   return (
@@ -23,6 +24,8 @@ const drawBranch = ({ node, ...rest }: any) => {
 };
 
 const drawNode = ({ node, ...rest }: any): any => {
+  console.log(node);
+
   if (!node || !node.$type) return;
   const { $type, id, name, outgoing, targetRef, sourceRef } = node;
 

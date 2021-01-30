@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import "./index.css";
 import BpmnModdle from "bpmn-moddle";
+import { pick } from "lodash";
 
 const moddle = new BpmnModdle();
 
@@ -21,15 +22,29 @@ const Task: React.FC<IProps> = memo(({ name, id, node, setParent }) => {
     const last = node.incoming[0]; // 应该是 seqFlow
 
     // next 和 last 应该都是 seqFlow 类型
-    last.targetRef = next.targetRef;
-    next.targetRef.incoming = [last];
+    last.set("targetRef", next.targetRef);
+    next.targetRef.set("incoming", [last]);
+
+    node.$parent.set(
+      "flowElements",
+      node.$parent.flowElements.filter(
+        (item: any) => item !== node && item !== next
+      )
+    );
+
     setParent(
       moddle.create("bpmn:Process", {
-        ...node.$parent,
+        ...pick(node.$parent, ["flowElements", "id"]),
       })
     );
 
     // 清空被删除节点的指针
+    node.set("outgoing", undefined);
+    node.set("incoming", undefined);
+
+    next.set("targetRef", undefined);
+    next.set("sourceRef", undefined);
+
     node.outgoing = null;
     node.incoming = null;
     next.targetRef = null;

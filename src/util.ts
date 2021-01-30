@@ -1,4 +1,8 @@
 import { TEM } from "./App";
+import BpmnModdle from "bpmn-moddle";
+
+const moddle = new BpmnModdle();
+
 export function uuid(type: string): string {
   return `${type}_${Math.random().toString(36).slice(-6)}`;
 }
@@ -23,11 +27,60 @@ export function findEndLast(node: any): any {
   return findEndLast(next(node));
 }
 
+// 从 parent的 flowElements 索引中删除或者添加元素
+export function changeFlowElements(parent: any, action: any, ...nodes: any[]) {
+  switch (action) {
+    case "-":
+      parent.flowElements = parent.flowElements.filter(
+        (item: any) => !nodes.includes(item)
+      );
+      break;
+    case "+":
+      nodes.forEach((item) => {
+        item.$parent = parent;
+      });
+      parent.flowElements.push(...nodes);
+      break;
+  }
+}
+
+// 生成新的 parent 节点
+export function updateParent(oldParent: any): any {
+  const { id, flowElements } = oldParent;
+  const newParent = moddle.create("bpmn:Process", {
+    id,
+    flowElements,
+    isExecutable: true,
+  });
+  newParent.$parent = oldParent.$parent;
+
+  return newParent;
+}
+
+// 遍历寻找节点
+export function findElementFromParent(parent: any, id: string) {
+  return parent.flowElements.find((item: any) => item.id === id);
+}
+
 // 获取节点的 endWay
 export function getEndWayFromGateway(node: any) {
-  console.log(node?.$attrs?.endWay);
-  return TEM.elementsById[node?.$attrs?.endWay];
+  const endWayId = node?.$attrs["xmlns:props"];
+  if (!endWayId) return;
+  return findElementFromParent(node.$parent, endWayId);
 }
+
+// walk 节点
+export function walk(
+  start: any,
+  endFc: (node: any) => boolean,
+  cb: (node: any) => void
+) {
+  if (!start) return;
+  if (endFc(start)) return;
+  cb(start);
+  walk(next(start), endFc, cb);
+}
+
 // 下载文件
 export function download(content: any, filename?: string) {
   const eleLink = document.createElement("a");

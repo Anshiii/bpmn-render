@@ -1,12 +1,36 @@
 import React, { memo } from "react";
 import "./index.css";
 import { Popover, Button, Divider } from "antd";
+
+import {
+  uuid,
+  findEndLast,
+  next,
+  changeFlowElements,
+  updateParent,
+  getEndWayFromGateway,
+  walk,
+} from "../util";
 import BpmnModdle from "bpmn-moddle";
-import { uuid, findEndLast, next } from "../util";
 
 const moddle = new BpmnModdle();
 
-type NodeType = "append" | "cc" | "condition";
+const addUserTaskToNode = (userTask: any, node: any) => {
+  const SequenceFlow = moddle.create("bpmn:SequenceFlow", {
+    id: uuid("SequenceFlow"),
+    sourceRef: userTask,
+    targetRef: node.targetRef,
+  });
+  userTask.outgoing = [SequenceFlow];
+  userTask.incoming = [node];
+
+  node.targetRef.incoming = [SequenceFlow];
+  node.targetRef = userTask;
+
+  changeFlowElements(node.$parent, "+", userTask, SequenceFlow);
+  // node.$parent.flowElements.push(userTask, SequenceFlow);
+};
+
 interface IProps {
   name: string;
   id: string;
@@ -30,42 +54,37 @@ const SequenceFlow: React.FC<IProps> = memo(
             id: uuid("UserTask"),
             name: "审批人",
           });
-          const SequenceFlow = moddle.create("bpmn:SequenceFlow", {
-            id: uuid("SequenceFlow"),
-            sourceRef: userTask,
-            targetRef: node.targetRef,
-          });
-          userTask.outgoing = [SequenceFlow];
-          userTask.incoming = [node];
+          addUserTaskToNode(userTask, node);
+          // @TIP set 相同对象不会触发更新
+          break;
 
-          node.targetRef.incoming = [SequenceFlow];
-          node.targetRef = userTask;
-
-          // @TIP 使用 update 不会继承原型上的属性
-          // const newContent = update(node, {
-          //   outgoing: {
-          //     $splice: [[0, 1, userTask]],
-          //   },
-          // });
-          // console.log("update后", newContent);
-
-          // @TIP set 相同对象不会出发更新
+        // 添加抄送人,本质和 审批人的逻辑一致
+        case "cc":
+          {
+            const ccTask = moddle.create("bpmn:UserTask", {
+              id: uuid("UserTask"),
+              name: "抄送人",
+            });
+            addUserTaskToNode(ccTask, node);
+          }
           break;
         // 添加条件
+
         case "condition":
           // 在此处添加网关，
           /* 为便于查询，添加条件时，会绑定此次网关的分支结束点，方便之后在分支结束点添加节点 */
           const unlessNodeId = uuid("ManualTask");
-          var end = moddle.create("bpmn:ManualTask", {
+          const end = moddle.create("bpmn:ManualTask", {
             id: unlessNodeId,
             name: "unless",
           });
-          var gateway = moddle.create("bpmn:ExclusiveGateway", {
+          const gateway = moddle.create("bpmn:ExclusiveGateway", {
             id: uuid("ExclusiveGateway"),
             name: "添加条件",
-            $attr: { endWay: unlessNodeId },
+            "xmlns:props": unlessNodeId, // 用于连接 end id 的指针
           });
-          var condition1 = moddle.create("bpmn:SequenceFlow", {
+          //@ts-ignore  @TODO 这样设置属性对吗？
+          const condition1 = moddle.create("bpmn:SequenceFlow", {
             id: uuid("SequenceFlow"),
             name: "设置条件",
             sourceRef: gateway,
@@ -74,7 +93,7 @@ const SequenceFlow: React.FC<IProps> = memo(
               body: "${ foo < bar }",
             }),
           });
-          var condition2 = moddle.create("bpmn:SequenceFlow", {
+          const condition2 = moddle.create("bpmn:SequenceFlow", {
             id: uuid("SequenceFlow"),
             name: "设置条件",
             sourceRef: gateway,
@@ -83,6 +102,11 @@ const SequenceFlow: React.FC<IProps> = memo(
               body: "${ foo < bar }",
             }),
           });
+
+          // 记录终点节点
+          const endLast = findEndLast(node); // endLast 应该是个 bpmn:SequenceFlow
+          const endNext = endLast.targetRef;
+
           // 起点转换
           gateway.incoming = [node];
           gateway.outgoing = [condition1, condition2];
@@ -91,9 +115,7 @@ const SequenceFlow: React.FC<IProps> = memo(
           condition1.targetRef.incoming = [condition1];
 
           // 终点转换
-          const endLast = findEndLast(node); // endLast 应该是个 bpmn:SequenceFlow
-          const endNext = endLast.targetRef;
-
+          // FLOW END 和 下一个结点的连接线
           const flow = moddle.create("bpmn:SequenceFlow", {
             id: uuid("SequenceFlow"),
             sourceRef: end,
@@ -108,37 +130,56 @@ const SequenceFlow: React.FC<IProps> = memo(
           );
           endNext.incoming.splice(idx, 1, flow);
           endLast.targetRef = end;
-          break;
-        // 添加抄送人,本质和 审批人的逻辑一致
-        case "cc": {
-          const ccTask = moddle.create("bpmn:UserTask", {
-            id: uuid("UserTask"),
-            name: "抄送人",
-          });
-          const SequenceFlow = moddle.create("bpmn:SequenceFlow", {
-            id: uuid("SequenceFlow"),
-            sourceRef: ccTask,
-            targetRef: node.targetRef,
-          });
-          ccTask.outgoing = [SequenceFlow];
-          ccTask.incoming = [node];
 
-          node.targetRef.incoming = [SequenceFlow];
-          node.targetRef = ccTask;
-        }
+          // 添加新节点到 flow 列表
+          changeFlowElements(
+            node.$parent,
+            "+",
+            end,
+            gateway,
+            condition1,
+            condition2,
+            flow
+          );
+          break;
       }
 
       // 触发渲染更新
-
-      setParent(
-        // node.$parent
-        moddle.create("bpmn:Process", {
-          ...node.$parent,
-        })
-      );
+      setParent(updateParent(node.$parent));
     };
 
-    // 特别类型支持添加条件
+    // 删除条件
+    const delCondition = () => {
+      const gateWay = node.sourceRef;
+      const endWay = getEndWayFromGateway(gateWay);
+      const parent = node.$parent;
+
+      const conditionIdx = gateWay.outgoing.findIndex(
+        (item: any) => item === node
+      );
+
+      if (gateWay.outgoing.length > 2) {
+        // 只删除某条 condition 分支
+        const delNodes: any[] = [];
+        walk(
+          node,
+          (node: any) => next(node) === endWay,
+          (node: any) => {
+            delNodes.push(node);
+          }
+        );
+
+        gateWay.outgoing.splice(conditionIdx, 1);
+        endWay.incoming.splice(conditionIdx, 1);
+
+        changeFlowElements(node.$parent, "-", ...delNodes);
+        // @TODO 清除被删除节点的指针关系？
+      } else {
+        // 删除包括 gateway/unless 在内的整个条件分支...
+      }
+
+      setParent(updateParent(parent));
+    };
 
     return (
       <div id={id}>
@@ -146,8 +187,11 @@ const SequenceFlow: React.FC<IProps> = memo(
         {/* 条件语句的 flow 需要渲染条件内容 */}
         {conditionExpression
           ? [
-              <div>{conditionExpression.body}</div>,
-              <div className="line"></div>,
+              <div key="del" onClick={delCondition}>
+                删除条件
+              </div>,
+              <div key="condition">{conditionExpression.body}</div>,
+              <div key="line" className="line"></div>,
             ]
           : null}
         <Popover

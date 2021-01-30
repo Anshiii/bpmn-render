@@ -35,10 +35,11 @@ function App() {
     const moddle = new BpmnModdle();
     const xmlStr =
       '<?xml version="1.0" encoding="UTF-8"?>' +
-      '<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" ' +
+      '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" ' +
       'id="empty-definitions" ' +
       'targetNamespace="http://bpmn.io/schema/bpmn">' +
-      "</bpmn2:definitions>";
+      // +`<bpmndi:BPMNDiagram id="${uuid("BPMNDiagram")}"></bpmndi:BPMNDiagram>` +
+      "</bpmn:definitions>";
 
     const { rootElement: definitions } = await moddle.fromXML(xmlStr);
     // update id attribute
@@ -50,11 +51,19 @@ function App() {
     // add a root element
     // definitions.rootElements = [parent];
 
-    console.log("parent", parent, parent.isGeneric);
+    console.log("parent", parent, definitions);
+    console.log("definitions", definitions);
 
     // xmlStrUpdated contains new id and the added process
-    const { xml: xmlStrUpdated } = await moddle.toXML(definitions);
-    download(xmlStrUpdated);
+    try {
+      const { xml: xmlStrUpdated } = await moddle.toXML(definitions, {
+        format: true,
+      });
+      console.log(xmlStrUpdated);
+      download(xmlStrUpdated);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
@@ -78,6 +87,7 @@ function App() {
                   TEM.elementsById = res.elementsById;
                   setDefinitions(res.rootElement);
                   console.log("response", res);
+                  console.log("definitions", res.rootElement);
                   setParent(res.rootElement.rootElements[0]);
                 });
             };
